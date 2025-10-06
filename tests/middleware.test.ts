@@ -24,6 +24,23 @@ describe("basic auth middleware", () => {
     expect(await resp.text()).toBe("ok");
   });
 
+  it("allows empty-string passwords", async () => {
+    const creds = btoa("user:");
+    const ctx = createContext(`Basic ${creds}`, { BASIC_USER: "user", BASIC_PASS: "" });
+    const resp = await onRequest(ctx);
+    expect(resp.status).toBe(200);
+  });
+
+  it("ignores trailing newlines from env vars", async () => {
+    const creds = btoa("user:pass");
+    const ctx = createContext(`Basic ${creds}`, {
+      BASIC_USER: "user\n",
+      BASIC_PASS: "pass\r\n"
+    });
+    const resp = await onRequest(ctx);
+    expect(resp.status).toBe(200);
+  });
+
   it("accepts case-insensitive scheme", async () => {
     const creds = btoa("user:pass");
     const ctx = createContext(`basic ${creds}`, { BASIC_USER: "user", BASIC_PASS: "pass" });

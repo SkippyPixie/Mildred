@@ -22,9 +22,14 @@ function decodeCredentials(header: string): { user: string; pass: string } | nul
   }
 }
 
+function sanitize(raw: string | undefined, fallback: string): string {
+  if (raw === undefined) return fallback;
+  return raw.replace(/[\r\n]+$/g, "");
+}
+
 export const onRequest: PagesFunction<{ BASIC_USER?: string; BASIC_PASS?: string }> = async (ctx) => {
-  const expectedUser = ctx.env.BASIC_USER || "mildred";
-  const expectedPass = ctx.env.BASIC_PASS || "knit";
+  const expectedUser = sanitize(ctx.env.BASIC_USER, "mildred");
+  const expectedPass = sanitize(ctx.env.BASIC_PASS, "knit");
   const header = ctx.request.headers.get("Authorization") || "";
 
   const creds = decodeCredentials(header);
