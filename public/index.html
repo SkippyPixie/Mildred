@@ -286,7 +286,12 @@
         if (a.uploading) { inner.style.setProperty('--p', a.progress + '%'); } else { bar.style.display='none'; }
 
         const remove = document.createElement('button'); remove.className='remove'; remove.setAttribute('aria-label', `Remove ${a.file.name}`); remove.textContent = '×';
-        remove.onclick = () => { URL.revokeObjectURL(a.url); attachments = attachments.filter(x => x.id !== a.id); renderPreviews(); updateAttachmentIndicators(); };
+        remove.onclick = () => {
+          if (a.url) { URL.revokeObjectURL(a.url); }
+          attachments = attachments.filter(x => x.id !== a.id);
+          renderPreviews();
+          updateAttachmentIndicators();
+        };
 
         el.append(thumb, info, bar, remove);
         previewsEl.appendChild(el);
