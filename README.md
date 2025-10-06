@@ -28,3 +28,5 @@ The production deployment is protected with HTTP Basic authentication using the 
 - **Password:** `knit`
 
 Set the `BASIC_USER` and `BASIC_PASS` environment variables in your hosting provider to change them, or remove the middleware if you do not need authentication.
+
+On Cloudflare Pages you can provide those values from **Settings → Environment variables**. Add the same pair under both the _Production_ and _Preview_ sections if you want every deployment to use your custom credentials. The middleware always checks the runtime environment first, so whatever you configure there takes precedence over the defaults documented above.
