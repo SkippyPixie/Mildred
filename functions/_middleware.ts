@@ -1,6 +1,11 @@
 export const onRequest: PagesFunction<{ BASIC_USER?: string; BASIC_PASS?: string }> = async (ctx) => {
-  const user = ctx.env.BASIC_USER || "mildred";
-  const pass = ctx.env.BASIC_PASS || "knit";
+  const user = ctx.env.BASIC_USER;
+  const pass = ctx.env.BASIC_PASS;
+
+  if (!user || !pass) {
+    return ctx.next();
+  }
+
   const header = ctx.request.headers.get("Authorization") || "";
 
   let ok = false;
@@ -17,11 +22,13 @@ export const onRequest: PagesFunction<{ BASIC_USER?: string; BASIC_PASS?: string
       ok = false;
     }
   }
+
   if (!ok) {
     return new Response("Auth required", {
       status: 401,
       headers: { "WWW-Authenticate": 'Basic realm="Mildred"' }
     });
   }
+
   return ctx.next();
 };
