@@ -2,10 +2,21 @@ export const onRequest: PagesFunction<{ BASIC_USER?: string; BASIC_PASS?: string
   const user = ctx.env.BASIC_USER || "mildred";
   const pass = ctx.env.BASIC_PASS || "knit";
   const header = ctx.request.headers.get("Authorization") || "";
-  const ok = header.startsWith("Basic ") && (() => {
-    const [u, p] = atob(header.slice(6)).split(":");
-    return u === user && p === pass;
-  })();
+
+  let ok = false;
+  if (header.startsWith("Basic ")) {
+    try {
+      const decoded = atob(header.slice(6));
+      const idx = decoded.indexOf(":");
+      if (idx !== -1) {
+        const u = decoded.slice(0, idx);
+        const p = decoded.slice(idx + 1);
+        ok = u === user && p === pass;
+      }
+    } catch {
+      ok = false;
+    }
+  }
   if (!ok) {
     return new Response("Auth required", {
       status: 401,
