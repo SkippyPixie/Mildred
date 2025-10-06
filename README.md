@@ -20,3 +20,15 @@ The production deployment is protected with HTTP Basic authentication using the 
 - **Password:** `knit`
 
 Set the `BASIC_USER` and `BASIC_PASS` environment variables in your hosting provider to change them, or remove the middleware if you do not need authentication.
+
+## Troubleshooting
+
+### "Merging is blocked" on your pull request
+
+If GitHub shows that merging is blocked, check the branch protections on `main`:
+
+- Resolve any failing status checks (for example, make sure the preview deployment succeeds).
+- Merge or rebase the branch on the latest `main` so it is up to date.
+- Request a fresh approval if reviews are required; approvals can be dismissed after new commits.
+
+Once these conditions are satisfied the merge button becomes available again.
