@@ -8,9 +8,10 @@ function unauthorized(): Response {
 }
 
 function decodeCredentials(header: string): { user: string; pass: string } | null {
-  if (!header.startsWith("Basic ")) return null;
+  if (!/^basic\s+/i.test(header)) return null;
+  const token = header.slice(header.indexOf(" ") + 1).trim();
   try {
-    const decoded = atob(header.slice(6));
+    const decoded = atob(token);
     const sep = decoded.indexOf(":");
     if (sep === -1) return null;
     const user = decoded.slice(0, sep);

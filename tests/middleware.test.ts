@@ -24,6 +24,13 @@ describe("basic auth middleware", () => {
     expect(await resp.text()).toBe("ok");
   });
 
+  it("accepts case-insensitive scheme", async () => {
+    const creds = btoa("user:pass");
+    const ctx = createContext(`basic ${creds}`, { BASIC_USER: "user", BASIC_PASS: "pass" });
+    const resp = await onRequest(ctx);
+    expect(resp.status).toBe(200);
+  });
+
   it("rejects invalid base64 input", async () => {
     const ctx = createContext("Basic not-base64");
     const resp = await onRequest(ctx);
