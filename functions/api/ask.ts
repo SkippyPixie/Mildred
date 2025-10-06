@@ -6,6 +6,10 @@ export const onRequestPost: PagesFunction<{ OPENAI_API_KEY: string }> = async ({
       return new Response("Bad request", { status: 400 });
     }
 
+    if (!env.OPENAI_API_KEY) {
+      return new Response("Missing API key", { status: 500 });
+    }
+
     const sys = "You are Mildred, a warm, practical knitting expert. Use cm and inches; be concise; include gauge math when useful.";
 
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
