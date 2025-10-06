@@ -15,7 +15,7 @@ export const onRequestPost: PagesFunction<{ OPENAI_API_KEY: string }> = async ({
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "gpt-5-thinking",
+        model: "gpt-4o-mini",
         temperature: 0.4,
         messages: [
           { role: "system", content: sys },
