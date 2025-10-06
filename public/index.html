@@ -376,7 +376,8 @@
     async function triggerSend(){
       if (sendBtn.disabled) return;
 
-      const message = msg.value.trim();
+      const originalText = msg.value;
+      const message = originalText.trim();
       if (!message) {
         announce('Type a message before sending');
         msg.focus();
@@ -384,6 +385,8 @@
       }
 
       appendMessage('user', message);
+      msg.value = '';
+      msg.dispatchEvent(new Event('input'));
       const originalLabel = sendBtn.textContent;
       sendBtn.disabled = true;
       sendBtn.setAttribute('aria-busy', 'true');
@@ -415,8 +418,6 @@
 
         const reply = await resp.text();
         appendMessage('assistant', reply.trim() || 'No answer.');
-        msg.value = '';
-        msg.dispatchEvent(new Event('input'));
         announce('Message sent');
 
         attachments.forEach(a => a.url && URL.revokeObjectURL(a.url));
@@ -425,6 +426,10 @@
       } catch (err) {
         console.error(err);
         appendMessage('error', err?.message || 'Something went wrong.');
+        if (!msg.value) {
+          msg.value = originalText;
+          msg.dispatchEvent(new Event('input'));
+        }
         for (const a of attachments){ a.uploading = false; a.progress = 0; }
         renderPreviews();
         announce('Message failed');
