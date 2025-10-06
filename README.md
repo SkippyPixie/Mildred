@@ -14,9 +14,4 @@ Then open the printed URL in your browser.
 
 ## Deployment auth
 
-The production deployment is protected with HTTP Basic authentication using the Cloudflare Pages middleware in `functions/_middleware.ts`. Unless you override the credentials with environment variables, the defaults are:
-
-- **Username:** `mildred`
-- **Password:** `knit`
-
-Set the `BASIC_USER` and `BASIC_PASS` environment variables in your hosting provider to change them, or remove the middleware if you do not need authentication.
+The production deployment can be protected with HTTP Basic authentication using the Cloudflare Pages middleware in `functions/_middleware.ts`. Set the `BASIC_USER` and `BASIC_PASS` environment variables in your hosting provider to enable authentication, or remove the middleware if you do not need it.
