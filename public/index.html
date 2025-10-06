@@ -31,7 +31,7 @@
 
     .wrap{
       max-width:920px; margin:0 auto; padding:24px; min-height:100%;
-      display:grid; grid-template-rows: 1fr auto; gap:16px;
+      display:grid; grid-template-rows: auto 1fr auto; gap:16px;
     }
 
     header{
@@ -45,7 +45,66 @@
     h1{ margin:0; font-size:18px; letter-spacing:.2px }
     .sub{ color:#394056; opacity:.8; font-size:13px }
 
-    main{ display:grid; align-content:end; }
+    main{
+      display:grid;
+      grid-template-rows: 1fr auto;
+      gap:16px;
+      min-height:0;
+    }
+
+    .thread{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      overflow-y:auto;
+      padding-right:4px;
+    }
+    .thread:focus-visible{ outline:2px solid var(--accent-amber); outline-offset:2px }
+    .msg{ display:grid; gap:8px; }
+    .msg.user{ justify-items:end; }
+    .msg.assistant{ justify-items:start; }
+    .bubble{
+      position:relative;
+      max-width:min(100%, 560px);
+      padding:12px 14px;
+      border-radius:16px;
+      background:#fff;
+      border:1px solid var(--ridge);
+      box-shadow:0 4px 16px #0001;
+    }
+    .msg.pending .bubble{ opacity:.85 }
+    .msg.error .bubble{
+      border-color: color-mix(in oklab, #d55 55%, var(--ridge));
+      background: color-mix(in oklab, #fdd 45%, #fff);
+      color:#4c1c1c;
+      box-shadow:0 4px 14px #0002;
+    }
+    .msg.user .bubble{
+      background: linear-gradient(135deg, var(--accent-moss), var(--accent-kingfisher));
+      color:#f5fbff;
+      border:0;
+    }
+    .files{
+      list-style:none;
+      padding:0;
+      margin:0;
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+    }
+    .files li{
+      font: 12px/1.1 var(--font-mono);
+      border:1px solid var(--ridge);
+      background:#fff6;
+      color:#364155;
+      border-radius:999px;
+      padding:4px 8px;
+    }
+    .msg.user .files li{
+      border-color:#ffffff55;
+      background:#ffffff22;
+      color:#eef6ff;
+    }
 
     /* Input bar */
     .inputbar{ position:sticky; bottom:0; backdrop-filter:saturate(1.1) blur(6px); padding:8px 0 16px; }
@@ -150,6 +209,8 @@
     </header>
 
     <main>
+      <div class="thread" id="thread" role="log" aria-live="polite" aria-label="Conversation" aria-busy="false"></div>
+
       <div class="inputbar" role="region" aria-label="Knitting input">
         <div class="chips" role="group" aria-label="Quick prompts">
           <button class="chip" data-insert="Cast-on">Cast‑on</button>
@@ -193,9 +254,12 @@
     const sendBtn    = document.getElementById('sendBtn');
     const msg        = document.getElementById('msg');
     const srStatus   = document.getElementById('srStatus');
+    const thread     = document.getElementById('thread');
+    const sendIdleLabel = sendBtn.textContent;
 
     let attachments = []; // { id, file, url, type, uploading, progress }
     let isComposing = false; // IME safety
+    let sending = false;
 
     attachBtn.addEventListener('click', () => filePicker.click());
     filePicker.addEventListener('change', () => addFiles([...filePicker.files]));
@@ -226,7 +290,7 @@
     msg.addEventListener('compositionstart', () => isComposing = true);
     msg.addEventListener('compositionend',   () => isComposing = false);
     msg.addEventListener('keydown', (e) => {
-      if (isComposing) return;
+      if (isComposing || sending) return;
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         triggerSend();
@@ -311,33 +375,138 @@
 
     function announce(text){ srStatus.textContent = ''; requestAnimationFrame(()=> srStatus.textContent = text); }
 
+    function fillBubble(el, text){
+      el.innerHTML = '';
+      const parts = String(text ?? '').split('\n');
+      parts.forEach((part, idx) => {
+        if (idx) el.appendChild(document.createElement('br'));
+        el.appendChild(document.createTextNode(part));
+      });
+    }
+
+    function appendMessage(role, text, options = {}){
+      if (!thread) return null;
+      const entry = document.createElement('div');
+      entry.className = `msg ${role}`;
+      if (options.pending) entry.classList.add('pending');
+      if (options.error) entry.classList.add('error');
+
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      fillBubble(bubble, text);
+      entry.appendChild(bubble);
+
+      if (Array.isArray(options.attachments) && options.attachments.length){
+        const list = document.createElement('ul');
+        list.className = 'files';
+        for (const file of options.attachments){
+          const item = document.createElement('li');
+          const sizeText = typeof file.size === 'number' ? ` • ${humanSize(file.size)}` : '';
+          item.textContent = `${file.name}${sizeText}`;
+          list.appendChild(item);
+        }
+        entry.appendChild(list);
+      }
+
+      thread.appendChild(entry);
+      thread.scrollTop = thread.scrollHeight;
+      return { entry, bubble };
+    }
+
+    function updateAssistantMessage(target, text, isError = false){
+      if (!target) return;
+      fillBubble(target.bubble, text);
+      target.entry.classList.toggle('pending', false);
+      target.entry.classList.toggle('error', Boolean(isError));
+    }
+
+    function setSending(state){
+      sending = state;
+      sendBtn.disabled = state;
+      if (state){
+        sendBtn.setAttribute('aria-busy', 'true');
+        sendBtn.textContent = 'Sending…';
+        if (thread) thread.setAttribute('aria-busy', 'true');
+      } else {
+        sendBtn.removeAttribute('aria-busy');
+        sendBtn.textContent = sendIdleLabel;
+        if (thread) thread.setAttribute('aria-busy', 'false');
+      }
+    }
+
     function ext(name){ const m = name.split('.').pop(); return (m||'FILE').slice(0,4).toUpperCase(); }
     function humanSize(b){ const u=['B','KB','MB','GB']; let i=0; while(b>=1024 && i<u.length-1){ b/=1024; i++; } return `${b.toFixed(b<10&&i?1:0)} ${u[i]}`; }
 
     // Send logic in a reusable function
     async function triggerSend(){
-      // mark uploading
-      for (const a of attachments){ a.uploading = true; a.progress = 10; }
-      renderPreviews();
-
-      // Simulate async upload progress (replace with real upload)
-      for (const a of attachments){
-        for (let p=10; p<=100; p+=30){ await new Promise(r=>setTimeout(r,130)); a.progress = p; renderPreviews(); }
+      if (sending) return;
+      const prompt = msg.value.trim();
+      if (!prompt){
+        announce('Please type a message before sending');
+        msg.focus();
+        return;
       }
 
-      // Example payload you might send to your model/backend
-      const payload = {
-        message: msg.value.trim(),
-        files: attachments.map(a => ({ name: a.file.name, type: a.type, size: a.file.size }))
-      };
-      console.log('Send payload →', payload);
+      const originalValue = msg.value;
+      const filesMeta = attachments.map(a => ({ name: a.file.name, size: a.file.size }));
 
-      // cleanup previews (leave message as-is for convenience)
-      attachments.forEach(a => a.url && URL.revokeObjectURL(a.url));
-      attachments = [];
-      renderPreviews();
-      announce('Message sent');
+      setSending(true);
+      announce('Sending message');
+
+      appendMessage('user', prompt, { attachments: filesMeta });
+      msg.value = '';
+
+      const assistantMessage = appendMessage('assistant', 'Thinking…', { pending: true });
+
+      if (attachments.length){
+        for (const a of attachments){ a.uploading = true; a.progress = 10; }
+        renderPreviews();
+        for (const a of attachments){
+          for (let p=10; p<=100; p+=30){
+            await new Promise(r=>setTimeout(r,130));
+            a.progress = p;
+            renderPreviews();
+          }
+        }
+      }
+
+      let success = false;
+      try {
+        const resp = await fetch('/api/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt, files: filesMeta })
+        });
+
+        if (!resp.ok) {
+          const errText = await resp.text();
+          throw new Error(errText || `Request failed with status ${resp.status}`);
+        }
+
+        let text = await resp.text();
+        text = text.trim() || 'I did not receive a reply.';
+        updateAssistantMessage(assistantMessage, text);
+        announce('Mildred replied');
+        success = true;
+      } catch (error) {
+        console.error('Send error', error);
+        updateAssistantMessage(assistantMessage, 'Sorry, I had trouble reaching Mildred. Please try again in a moment.', true);
+        announce('Message failed to send');
+        msg.value = originalValue;
+      } finally {
+        if (success){
+          for (const a of attachments){ if (a.url) URL.revokeObjectURL(a.url); }
+          attachments = [];
+        } else {
+          for (const a of attachments){ a.uploading = false; a.progress = 0; }
+        }
+        renderPreviews();
+        setSending(false);
+        msg.focus();
+      }
     }
+
+    appendMessage('assistant', 'Hi! I\'m Mildred — share what you\'re knitting and I\'ll help with yarn math, fixes, and more.');
 
     // Buttons
     sendBtn.addEventListener('click', triggerSend);
