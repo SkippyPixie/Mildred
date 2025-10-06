@@ -213,6 +213,9 @@
     const srStatus   = document.getElementById('srStatus');
     const conversationEl = document.getElementById('conversation');
 
+    const conversationLog = [];
+    const MAX_HISTORY_ENTRIES = 20; // keep roughly 10 exchanges of context
+
     let attachments = []; // { id, file, url, type, uploading, progress }
     let isComposing = false; // IME safety
 
@@ -334,6 +337,18 @@
     function humanSize(b){ const u=['B','KB','MB','GB']; let i=0; while(b>=1024 && i<u.length-1){ b/=1024; i++; } return `${b.toFixed(b<10&&i?1:0)} ${u[i]}`; }
 
     // Send logic in a reusable function
+    function trimConversation(){
+      if (conversationLog.length > MAX_HISTORY_ENTRIES) {
+        conversationLog.splice(0, conversationLog.length - MAX_HISTORY_ENTRIES);
+      }
+    }
+
+    function buildHistory(){
+      if (conversationLog.length <= 1) return [];
+      const withoutCurrent = conversationLog.slice(0, -1);
+      return withoutCurrent.slice(-MAX_HISTORY_ENTRIES).map(entry => ({ role: entry.role, content: entry.content }));
+    }
+
     function appendMessage(role, text){
       const bubble = document.createElement('div');
       bubble.className = `bubble ${role}`;
@@ -346,8 +361,12 @@
       const prompt = msg.value.trim();
       if (!prompt) return;
 
+      conversationLog.push({ role: 'user', content: prompt });
+      trimConversation();
+
       appendMessage('user', prompt);
       msg.value = '';
+      msg.dispatchEvent(new Event('input'));
 
       sendBtn.disabled = true;
       sendBtn.setAttribute('aria-busy', 'true');
@@ -360,7 +379,7 @@
         const response = await fetch('/api/ask', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt })
+          body: JSON.stringify({ prompt, history: buildHistory() })
         });
 
         if (!response.ok) {
@@ -371,7 +390,10 @@
         }
 
         const reply = await response.text();
-        appendMessage('assistant', reply.trim() ? reply : '(No response text)');
+        const replyText = reply.trim() ? reply : '(No response text)';
+        appendMessage('assistant', replyText);
+        conversationLog.push({ role: 'assistant', content: replyText });
+        trimConversation();
         announce('Reply available');
       } catch (err) {
         appendMessage('system', `Network error: ${err.message || err}`);
