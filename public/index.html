@@ -217,7 +217,11 @@
     document.querySelectorAll('.chip').forEach(chip => {
       chip.addEventListener('click', () => {
         const txt = chip.dataset.insert || chip.textContent.trim();
-        insertAtCursor(msg, (msg.value ? txt + ': ' : txt + ': '));
+        const start = msg.selectionStart ?? msg.value.length;
+        const beforeCursor = msg.value.slice(0, start);
+        const needsNewline = beforeCursor.length && !/\n$/.test(beforeCursor);
+        const insertion = `${needsNewline ? '\n' : ''}${txt}: `;
+        insertAtCursor(msg, insertion);
         msg.focus();
       });
     });
