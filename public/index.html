@@ -47,6 +47,22 @@
 
     main{ display:grid; align-content:end; }
 
+    .conversation{
+      display:flex; flex-direction:column; gap:12px; padding:0 4px 12px;
+      max-height:45vh; overflow-y:auto; scroll-behavior:smooth;
+    }
+    .conversation:focus-visible{ outline:2px solid var(--accent-amber); outline-offset:4px }
+    .bubble{
+      align-self:flex-start; max-width:70%; padding:12px 14px; border-radius:14px;
+      background:#fff; border:1px solid var(--ridge); box-shadow:0 2px 6px #0001;
+      white-space:pre-wrap; word-break:break-word;
+    }
+    .bubble.user{
+      align-self:flex-end; background:linear-gradient(135deg,var(--accent-moss),var(--accent-kingfisher));
+      color:#fff; border-color:transparent;
+    }
+    .bubble.system{ background:#ffe8d1; border-color:#f5c387; color:#5a3b0d; }
+
     /* Input bar */
     .inputbar{ position:sticky; bottom:0; backdrop-filter:saturate(1.1) blur(6px); padding:8px 0 16px; }
     .chips{ display:flex; gap:8px; flex-wrap:wrap; margin:0 0 10px 0; }
@@ -150,6 +166,8 @@
     </header>
 
     <main>
+      <div class="conversation" id="conversation" role="log" aria-live="polite" aria-label="Conversation"></div>
+
       <div class="inputbar" role="region" aria-label="Knitting input">
         <div class="chips" role="group" aria-label="Quick prompts">
           <button class="chip" data-insert="Cast-on">Cast‑on</button>
@@ -193,6 +211,7 @@
     const sendBtn    = document.getElementById('sendBtn');
     const msg        = document.getElementById('msg');
     const srStatus   = document.getElementById('srStatus');
+    const conversationEl = document.getElementById('conversation');
 
     let attachments = []; // { id, file, url, type, uploading, progress }
     let isComposing = false; // IME safety
@@ -315,28 +334,57 @@
     function humanSize(b){ const u=['B','KB','MB','GB']; let i=0; while(b>=1024 && i<u.length-1){ b/=1024; i++; } return `${b.toFixed(b<10&&i?1:0)} ${u[i]}`; }
 
     // Send logic in a reusable function
+    function appendMessage(role, text){
+      const bubble = document.createElement('div');
+      bubble.className = `bubble ${role}`;
+      bubble.textContent = text;
+      conversationEl.appendChild(bubble);
+      conversationEl.scrollTop = conversationEl.scrollHeight;
+    }
+
     async function triggerSend(){
-      // mark uploading
-      for (const a of attachments){ a.uploading = true; a.progress = 10; }
-      renderPreviews();
+      const prompt = msg.value.trim();
+      if (!prompt) return;
 
-      // Simulate async upload progress (replace with real upload)
-      for (const a of attachments){
-        for (let p=10; p<=100; p+=30){ await new Promise(r=>setTimeout(r,130)); a.progress = p; renderPreviews(); }
+      appendMessage('user', prompt);
+      msg.value = '';
+
+      sendBtn.disabled = true;
+      sendBtn.setAttribute('aria-busy', 'true');
+
+      for (const a of attachments){ a.uploading = true; a.progress = 25; }
+      renderPreviews();
+      announce('Message sent, waiting for reply');
+
+      try {
+        const response = await fetch('/api/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt })
+        });
+
+        if (!response.ok) {
+          const errorText = (await response.text()) || `Request failed (${response.status})`;
+          appendMessage('system', `Error: ${errorText}`);
+          announce('Reply failed');
+          return;
+        }
+
+        const reply = await response.text();
+        appendMessage('assistant', reply.trim() ? reply : '(No response text)');
+        announce('Reply available');
+      } catch (err) {
+        appendMessage('system', `Network error: ${err.message || err}`);
+        announce('Reply failed');
+      } finally {
+        attachments.forEach(a => a.url && URL.revokeObjectURL(a.url));
+        attachments = [];
+        renderPreviews();
+        filePicker.value = '';
+        sendBtn.disabled = false;
+        sendBtn.removeAttribute('aria-busy');
+        updateAttachmentIndicators();
       }
-
-      // Example payload you might send to your model/backend
-      const payload = {
-        message: msg.value.trim(),
-        files: attachments.map(a => ({ name: a.file.name, type: a.type, size: a.file.size }))
-      };
-      console.log('Send payload →', payload);
-
-      // cleanup previews (leave message as-is for convenience)
-      attachments.forEach(a => a.url && URL.revokeObjectURL(a.url));
-      attachments = [];
-      renderPreviews();
-      announce('Message sent');
     }
 
     // Buttons
