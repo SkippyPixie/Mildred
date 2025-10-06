@@ -1,0 +1,12 @@
+<!doctype html><title>Mildred</title>
+<h1>Mildred, your knitting helper</h1>
+<form id=f><textarea id=q placeholder="Ask Mildred anything about knitting…" rows=4 style="width:100%"></textarea><br><button>Ask</button></form>
+<pre id=out></pre>
+<script>
+f.onsubmit = async e=>{
+  e.preventDefault();
+  out.textContent="Thinking…";
+  const r=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q.value})});
+  out.textContent=await r.text();
+};
+</script>
