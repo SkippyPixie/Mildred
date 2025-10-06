@@ -279,7 +279,10 @@
         const size = document.createElement('span'); size.className='size'; size.textContent = humanSize(a.file.size);
         info.append(name, size);
 
-        const bar = document.createElement('div'); bar.className='bar'; const inner = document.createElement('span'); bar.appendChild(inner);
+        const bar = document.createElement('div');
+        bar.className = 'bar';
+        const inner = document.createElement('span');
+        bar.appendChild(inner);
         if (a.uploading) { inner.style.setProperty('--p', a.progress + '%'); } else { bar.style.display='none'; }
 
         const remove = document.createElement('button'); remove.className='remove'; remove.setAttribute('aria-label', `Remove ${a.file.name}`); remove.textContent = '×';
